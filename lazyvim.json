@@ -1,0 +1,11 @@
+{
+  "extras": [
+    "lazyvim.plugins.extras.coding.yanky",
+    "lazyvim.plugins.extras.dap.core",
+    "lazyvim.plugins.extras.editor.inc-rename"
+  ],
+  "news": {
+    "NEWS.md": "10960"
+  },
+  "version": 7
+}
