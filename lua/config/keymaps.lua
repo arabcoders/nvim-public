@@ -37,3 +37,5 @@ keymap.set("n", "<F3>", "'Nn'[v:searchforward].'zv'", {
   silent = true,
   desc = "Search forward",
 })
+
+keymap.set({ "n", "x", "i" }, "<C-C>", '"*y', { silent = true, desc = "Copy to system clipboard" })

@@ -46,3 +46,21 @@ vim.cmd([[au BufNewFile,BufRead Podfile setf ruby]])
 if vim.fn.has("nvim-0.8") == 1 then
   vim.opt.cmdheight = 0
 end
+
+local function no_paste(_)
+  return function(_)
+    -- Do nothing! We can't paste with OSC52
+  end
+end
+
+vim.g.clipboard = {
+  name = "OSC 52",
+  copy = {
+    ["+"] = require("vim.ui.clipboard.osc52").copy("+"),
+    ["*"] = require("vim.ui.clipboard.osc52").copy("*"),
+  },
+  paste = {
+    ["+"] = no_paste("+"), -- Pasting disabled
+    ["*"] = no_paste("*"), -- Pasting disabled
+  },
+}
