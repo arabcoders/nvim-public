@@ -10,17 +10,28 @@ local plugin = {
     "williamboman/mason.nvim",
     opts = function(_, opts)
       -- phpactor
-      vim.list_extend(opts.ensure_installed, { "intelephense", "php-cs-fixer" })
+      vim.list_extend(opts.ensure_installed, { "intelephense", "php-cs-fixer", "phpactor" })
     end,
   },
   {
     "neovim/nvim-lspconfig",
     opts = {
       servers = {
-        intelephense = {},
-        --   phpactor = {},
+        intelephense = {
+          settings = {
+            environment = {
+              globalStoragePath = "/tmp/intelephense",
+            },
+          },
+        },
+        phpactor = {},
       },
-      setup = {},
+      setup = {
+        intelephense = function(_, opts)
+          opts.globalStoragePath = "/tmp/intelephense"
+          require("lspconfig").intelephense.setup(opts)
+        end,
+      },
     },
   },
   {
