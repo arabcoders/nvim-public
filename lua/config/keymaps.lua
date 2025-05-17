@@ -39,3 +39,9 @@ keymap.set("n", "<F3>", "'Nn'[v:searchforward].'zv'", {
 })
 
 keymap.set({ "n", "x", "i" }, "<C-C>", '"*y', { silent = true, desc = "Copy to system clipboard" })
+
+-- Visual‑mode Ctrl+/ → gc (toggle comment)
+keymap.set("v", "<C-/>", "gc", { remap = true, silent = true, desc = "Toggle comment" })
+
+-- Some terminals send Ctrl+/ as <C-_>
+keymap.set("v", "<C-_>", "gc", { remap = true, silent = true, desc = "Toggle comment" })
