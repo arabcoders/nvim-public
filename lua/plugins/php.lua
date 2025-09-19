@@ -7,7 +7,7 @@ local plugin = {
     end,
   },
   {
-    "williamboman/mason.nvim",
+    "mason-org/mason.nvim",
     opts = function(_, opts)
       -- phpactor
       vim.list_extend(opts.ensure_installed, { "intelephense", "php-cs-fixer", "phpactor" })
