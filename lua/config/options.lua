@@ -47,23 +47,26 @@ if vim.fn.has("nvim-0.8") == 1 then
   vim.opt.cmdheight = 0
 end
 
-local function no_paste(_)
-  return function(_)
-    -- Do nothing! We can't paste with OSC52
-  end
+local function is_remote()
+  return vim.env.SSH_CONNECTION or vim.env.SSH_CLIENT or vim.env.SSH_TTY
 end
 
--- my terminal doesnt support osc52, so if yours does uncomment the name lines.
-vim.opt.clipboard = "unnamedplus"
-
--- vim.g.clipboard = {
---   name = "OSC 52",
---   copy = {
---     ["+"] = require("vim.ui.clipboard.osc52").copy("+"),
---     ["*"] = require("vim.ui.clipboard.osc52").copy("*"),
---   },
---   paste = {
---     ["+"] = no_paste("+"), -- Pasting disabled
---     ["*"] = no_paste("*"), -- Pasting disabled
---   },
--- }
+if is_remote() then
+  -- Remote: use OSC52 (copies through terminal)
+  local osc52 = require("vim.ui.clipboard.osc52")
+  vim.g.clipboard = {
+    name = "OSC52",
+    copy = {
+      ["+"] = osc52.copy("+"),
+      ["*"] = osc52.copy("*"),
+    },
+    paste = {
+      ["+"] = osc52.paste("+"),
+      ["*"] = osc52.paste("*"),
+    },
+  }
+else
+  -- Local: use native clipboard (xclip/wl-copy)
+  vim.g.clipboard = nil
+  vim.opt.clipboard = "unnamedplus"
+end
