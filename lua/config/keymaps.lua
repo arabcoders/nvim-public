@@ -38,7 +38,9 @@ keymap.set("n", "<F3>", "'Nn'[v:searchforward].'zv'", {
   desc = "Search forward",
 })
 
-keymap.set({ "n", "x", "i" }, "<C-C>", '"*y', { silent = true, desc = "Copy to system clipboard" })
+keymap.set({ "n", "x", }, "<C-C>", '"+y', { silent = true, desc = "Copy to system clipboard" })
+keymap.set("i", "<C-C>", '<Esc>"+yyA', { silent = true, desc = "Copy line to system clipboard" })
+
 
 -- Visual‑mode Ctrl+/ → gc (toggle comment)
 keymap.set("v", "<C-/>", "gc", { remap = true, silent = true, desc = "Toggle comment" })

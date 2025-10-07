@@ -53,14 +53,17 @@ local function no_paste(_)
   end
 end
 
-vim.g.clipboard = {
-  name = "OSC 52",
-  copy = {
-    ["+"] = require("vim.ui.clipboard.osc52").copy("+"),
-    ["*"] = require("vim.ui.clipboard.osc52").copy("*"),
-  },
-  paste = {
-    ["+"] = no_paste("+"), -- Pasting disabled
-    ["*"] = no_paste("*"), -- Pasting disabled
-  },
-}
+-- my terminal doesnt support osc52, so if yours does uncomment the name lines.
+vim.opt.clipboard = "unnamedplus"
+
+-- vim.g.clipboard = {
+--   name = "OSC 52",
+--   copy = {
+--     ["+"] = require("vim.ui.clipboard.osc52").copy("+"),
+--     ["*"] = require("vim.ui.clipboard.osc52").copy("*"),
+--   },
+--   paste = {
+--     ["+"] = no_paste("+"), -- Pasting disabled
+--     ["*"] = no_paste("*"), -- Pasting disabled
+--   },
+-- }
