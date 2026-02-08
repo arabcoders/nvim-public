@@ -6,7 +6,7 @@ local plugin = {
   {
     "LazyVim/LazyVim",
     opts = {
-      colorscheme = "catppuccin-frappe",
+      colorscheme = "catppuccin-mocha",
     },
   },
 }
