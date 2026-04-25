@@ -1,4 +1,13 @@
--- Plugins for PHP language.
+local function find_mago()
+  local local_mago = vim.fn.getcwd() .. "/vendor/bin/mago"
+
+  if vim.fn.executable(local_mago) == 1 then
+    return local_mago
+  end
+
+  return "mago"
+end
+
 local plugin = {
   {
     "nvim-treesitter/nvim-treesitter",
@@ -9,28 +18,17 @@ local plugin = {
   {
     "mason-org/mason.nvim",
     opts = function(_, opts)
-      -- phpactor
-      vim.list_extend(opts.ensure_installed, { "intelephense", "php-cs-fixer", "phpactor" })
+      vim.list_extend(opts.ensure_installed, {
+        "intelephense",
+      })
     end,
   },
   {
     "neovim/nvim-lspconfig",
     opts = {
       servers = {
-        intelephense = {
-          settings = {
-            environment = {
-              globalStoragePath = "/tmp/intelephense",
-            },
-          },
-        },
+        intelephense = {},
         phpactor = {},
-      },
-      setup = {
-        intelephense = function(_, opts)
-          opts.globalStoragePath = "/tmp/intelephense"
-          require("lspconfig").intelephense.setup(opts)
-        end,
       },
     },
   },
@@ -40,18 +38,16 @@ local plugin = {
     event = { "BufReadPre", "BufNewFile" },
     opts = {
       formatters_by_ft = {
-        php = { "php-cs-fixer" },
+        php = { "mago" },
       },
       formatters = {
-        ["php-cs-fixer"] = {
-          command = "php-cs-fixer",
+        mago = {
+          command = find_mago,
           args = {
-            "fix",
-            -- Formatting preset. Other presets are available, see the php-cs-fixer docs.
-            "--rules=@PSR12",
-            "$FILENAME",
+            "format",
+            "--stdin-input",
           },
-          stdin = false,
+          stdin = true,
         },
       },
       notify_on_error = true,
