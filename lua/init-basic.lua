@@ -10,33 +10,24 @@ vim.g.markdown_recommended_style = 0
 local opt = vim.opt
 local keymap = vim.keymap
 
-vim.scriptencoding = "utf-8"
-opt.encoding = "utf-8"
 opt.fileencoding = "utf-8"
 
 opt.autowrite = true
 opt.number = true
 opt.relativenumber = true
 opt.title = true
-opt.autoindent = true
 opt.smartindent = true
-opt.hlsearch = true
-opt.backup = false
-opt.showcmd = true
-opt.cmdheight = 1
 opt.laststatus = 1
 opt.backupskip = { "/tmp/*", "/private/tmp/*" }
 opt.expandtab = true
 opt.inccommand = "split"
 opt.ignorecase = true
 opt.smartcase = true
-opt.smarttab = true
 opt.breakindent = true
 opt.shiftwidth = 4
 opt.tabstop = 2
 opt.wrap = false
 opt.linebreak = true
-opt.backspace = { "start", "eol", "indent" }
 opt.path:append({ "**" })
 opt.wildignore:append({ "*/node_modules/*", "*/vendor/*" })
 opt.splitbelow = true
@@ -45,7 +36,6 @@ opt.splitkeep = "cursor"
 opt.completeopt = "menu,menuone,noselect"
 opt.confirm = true
 opt.cursorline = true
-opt.grepformat = "%f:%l:%c:%m"
 opt.grepprg = "rg --vimgrep"
 opt.jumpoptions = "view"
 opt.mouse = "a"
@@ -68,17 +58,74 @@ opt.conceallevel = 2
 
 -- Add asterisks in block comments
 opt.formatoptions = "jcroqlnt"
-opt.formatoptions:append({ "r" })
 
 if vim.fn.has("nvim-0.8") == 1 then
   opt.cmdheight = 0
 end
 
+local parent_env = nil
+
+local function read_file(path)
+  local file = io.open(path, "rb")
+  if not file then
+    return nil
+  end
+
+  local data = file:read("*a")
+  file:close()
+  return data
+end
+
+local function load_parent_env()
+  if parent_env ~= nil then
+    return parent_env
+  end
+
+  parent_env = {}
+  local pid = tostring(vim.fn.getpid())
+
+  for _ = 1, 12 do
+    local status = read_file("/proc/" .. pid .. "/status")
+    if not status then
+      break
+    end
+
+    local ppid = status:match("\nPPid:%s+(%d+)") or status:match("^PPid:%s+(%d+)")
+    if not ppid or ppid == "0" then
+      break
+    end
+
+    local environ = read_file("/proc/" .. ppid .. "/environ")
+    if environ then
+      for entry in environ:gmatch("([^%z]+)") do
+        local key, value = entry:match("^([^=]+)=(.*)$")
+        if key and value and parent_env[key] == nil then
+          parent_env[key] = value
+        end
+      end
+    end
+
+    pid = ppid
+  end
+
+  return parent_env
+end
+
+local function inherited_env(name)
+  local value = vim.env[name]
+  if value and value ~= "" then
+    return value
+  end
+
+  return load_parent_env()[name]
+end
+
 local function is_remote()
-  return vim.env.SSH_CONNECTION or vim.env.SSH_CLIENT or vim.env.SSH_TTY
+  return inherited_env("SSH_CONNECTION") or inherited_env("SSH_CLIENT") or inherited_env("SSH_TTY")
 end
 
 if is_remote() then
+  -- Remote: use OSC52 (copies through terminal)
   local osc52 = require("vim.ui.clipboard.osc52")
   vim.g.clipboard = {
     name = "OSC52",
@@ -92,11 +139,48 @@ if is_remote() then
     },
   }
 else
+  -- Let Neovim choose the best builtin provider (tmux/xclip/wl-copy/etc.)
   vim.g.clipboard = nil
   opt.clipboard = "unnamedplus"
 end
 
+vim.filetype.add({
+  extension = {
+    req = "http",
+  },
+  filename = {
+    Caddyfile = "caddyfile",
+    Podfile = "ruby",
+  },
+  pattern = {
+    [".*%.Caddyfile"] = "caddyfile",
+  },
+})
+
 local opts = { noremap = true, silent = true }
+
+local function toggle_list(kind)
+  local ok_toggle, err = pcall(function()
+    if kind == "loc" then
+      if vim.fn.getloclist(0, { winid = 0 }).winid ~= 0 then
+        vim.cmd.lclose()
+      else
+        vim.cmd.lopen()
+      end
+      return
+    end
+
+    if vim.fn.getqflist({ winid = 0 }).winid ~= 0 then
+      vim.cmd.cclose()
+    else
+      vim.cmd.copen()
+    end
+  end)
+
+  if not ok_toggle and err then
+    vim.notify(err, vim.log.levels.ERROR)
+  end
+end
 
 -- LazyVim built-in keymaps that do not depend on plugins
 keymap.set({ "n", "x" }, "j", "v:count == 0 ? 'gj' : 'j'", { expr = true, silent = true, desc = "Down" })
@@ -121,6 +205,25 @@ keymap.set("n", "<S-h>", "<cmd>bprevious<cr>", { desc = "Prev Buffer" })
 keymap.set("n", "<S-l>", "<cmd>bnext<cr>", { desc = "Next Buffer" })
 keymap.set("n", "[b", "<cmd>bprevious<cr>", { desc = "Prev Buffer" })
 keymap.set("n", "]b", "<cmd>bnext<cr>", { desc = "Next Buffer" })
+keymap.set("n", "<leader>bb", "<cmd>e #<cr>", { desc = "Switch to Other Buffer" })
+keymap.set("n", "<leader>`", "<cmd>e #<cr>", { desc = "Switch to Other Buffer" })
+keymap.set({ "i", "n" }, "<esc>", function()
+  vim.cmd("nohlsearch")
+  return "<esc>"
+end, { expr = true, desc = "Escape and Clear hlsearch" })
+keymap.set("n", "<leader>ur", "<Cmd>nohlsearch<Bar>diffupdate<Bar>normal! <C-L><CR>", {
+  desc = "Redraw / Clear hlsearch / Diff Update",
+})
+keymap.set("n", "n", "'Nn'[v:searchforward].'zv'", { expr = true, desc = "Next Search Result" })
+keymap.set("x", "n", "'Nn'[v:searchforward]", { expr = true, desc = "Next Search Result" })
+keymap.set("o", "n", "'Nn'[v:searchforward]", { expr = true, desc = "Next Search Result" })
+keymap.set("n", "N", "'nN'[v:searchforward].'zv'", { expr = true, desc = "Prev Search Result" })
+keymap.set("x", "N", "'nN'[v:searchforward]", { expr = true, desc = "Prev Search Result" })
+keymap.set("o", "N", "'nN'[v:searchforward]", { expr = true, desc = "Prev Search Result" })
+keymap.set({ "i", "x", "n", "s" }, "<C-s>", "<cmd>w<cr><esc>", { desc = "Save File" })
+keymap.set("n", "<leader>K", "<cmd>norm! K<cr>", { desc = "Keywordprg" })
+keymap.set("x", "<", "<gv")
+keymap.set("x", ">", ">gv")
 local diagnostic_goto = function(next, severity)
   return function()
     vim.diagnostic.jump({
@@ -130,25 +233,38 @@ local diagnostic_goto = function(next, severity)
     })
   end
 end
+keymap.set("n", "<leader>cd", vim.diagnostic.open_float, { desc = "Line Diagnostics" })
 keymap.set("n", "]d", diagnostic_goto(true), { desc = "Next Diagnostic" })
 keymap.set("n", "[d", diagnostic_goto(false), { desc = "Prev Diagnostic" })
 keymap.set("n", "]e", diagnostic_goto(true, "ERROR"), { desc = "Next Error" })
 keymap.set("n", "[e", diagnostic_goto(false, "ERROR"), { desc = "Prev Error" })
 keymap.set("n", "]w", diagnostic_goto(true, "WARN"), { desc = "Next Warning" })
 keymap.set("n", "[w", diagnostic_goto(false, "WARN"), { desc = "Prev Warning" })
+keymap.set("n", "<leader>xl", function()
+  toggle_list("loc")
+end, { desc = "Location List" })
+keymap.set("n", "<leader>xq", function()
+  toggle_list("qf")
+end, { desc = "Quickfix List" })
+keymap.set("n", "[q", vim.cmd.cprev, { desc = "Previous Quickfix" })
+keymap.set("n", "]q", vim.cmd.cnext, { desc = "Next Quickfix" })
 keymap.set("n", "<leader>qq", "<cmd>qa<cr>", { desc = "Quit All" })
 keymap.set("n", "<leader>ui", vim.show_pos, { desc = "Inspect Pos" })
+keymap.set("n", "<leader>fn", "<cmd>enew<cr>", { desc = "New File" })
+keymap.set("n", "<leader>-", "<C-W>s", { remap = true, desc = "Split Window Below" })
+keymap.set("n", "<leader>|", "<C-W>v", { remap = true, desc = "Split Window Right" })
+keymap.set("n", "<leader>wd", "<C-W>c", { remap = true, desc = "Delete Window" })
 keymap.set("n", "<leader><tab>l", "<cmd>tablast<cr>", { desc = "Last Tab" })
 keymap.set("n", "<leader><tab>o", "<cmd>tabonly<cr>", { desc = "Close Other Tabs" })
 keymap.set("n", "<leader><tab>f", "<cmd>tabfirst<cr>", { desc = "First Tab" })
 keymap.set("n", "<leader><tab><tab>", "<cmd>tabnew<cr>", { desc = "New Tab" })
 keymap.set("n", "<leader><tab>]", "<cmd>tabnext<cr>", { desc = "Next Tab" })
+keymap.set("n", "<leader><tab>d", "<cmd>tabclose<cr>", { desc = "Close Tab" })
+keymap.set("n", "<leader><tab>[", "<cmd>tabprevious<cr>", { desc = "Previous Tab" })
 
 -- Repo custom built-in keymaps
 keymap.set("i", "<C-e>", "<esc><S-a>", { silent = true, desc = "End of line" })
-keymap.set("n", "<C-e>", "<S-a><esc>", { silent = true, desc = "End of line" })
 keymap.set("i", "<C-w>", "<esc><S-i>", { silent = true, desc = "Start of line" })
-keymap.set("n", "<C-w>", "<S-i><esc>", { silent = true, desc = "Start of line" })
 keymap.set("n", "<S-tab>", ":bprev<Return>", opts)
 keymap.set("n", "<F2>", function() vim.diagnostic.goto_next() end)
 keymap.set("n", "<C-a>", "gg<S-v>G")
@@ -191,6 +307,50 @@ vim.api.nvim_create_autocmd("VimResized", {
   end,
 })
 
+vim.api.nvim_create_autocmd("BufReadPost", {
+  group = augroup("last_loc"),
+  callback = function(event)
+    local buf = event.buf
+    if vim.bo[buf].filetype == "gitcommit" or vim.b[buf].standalone_last_loc then
+      return
+    end
+
+    vim.b[buf].standalone_last_loc = true
+    local mark = vim.api.nvim_buf_get_mark(buf, '"')
+    local line_count = vim.api.nvim_buf_line_count(buf)
+    if mark[1] > 0 and mark[1] <= line_count then
+      pcall(vim.api.nvim_win_set_cursor, 0, mark)
+    end
+  end,
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+  group = augroup("close_with_q"),
+  pattern = { "checkhealth", "help", "man", "qf" },
+  callback = function(event)
+    vim.bo[event.buf].buflisted = false
+    vim.schedule(function()
+      keymap.set("n", "q", function()
+        vim.cmd("close")
+        pcall(vim.api.nvim_buf_delete, event.buf, { force = true })
+      end, {
+        buffer = event.buf,
+        silent = true,
+        desc = "Quit buffer",
+      })
+    end)
+  end,
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+  group = augroup("wrap_spell"),
+  pattern = { "text", "plaintex", "typst", "gitcommit", "markdown" },
+  callback = function()
+    vim.opt_local.wrap = true
+    vim.opt_local.spell = true
+  end,
+})
+
 -- Repo custom autocmds
 vim.api.nvim_create_autocmd("InsertLeave", {
   group = augroup("nopaste"),
@@ -200,37 +360,23 @@ vim.api.nvim_create_autocmd("InsertLeave", {
 
 vim.api.nvim_create_autocmd("FileType", {
   group = augroup("no_conceal"),
-  pattern = { "json", "jsonc", "markdown" },
+  pattern = { "json", "json5", "jsonc", "markdown" },
   callback = function()
-    vim.opt.conceallevel = 0
+    vim.opt_local.conceallevel = 0
   end,
 })
 
-vim.api.nvim_create_autocmd({ "BufNewFile", "BufRead" }, {
-  group = augroup("filetypes_php"),
-  pattern = "*.php",
-  command = "setf php",
-})
+vim.api.nvim_create_autocmd("BufWritePre", {
+  group = augroup("auto_create_dir"),
+  callback = function(event)
+    if event.match:match("^%w%w+:[\\/][\\/]") then
+      return
+    end
 
-vim.api.nvim_create_autocmd({ "BufNewFile", "BufRead" }, {
-  group = augroup("filetypes_typescript"),
-  pattern = "*.ts",
-  command = "setf typescript",
+    local file = vim.uv.fs_realpath(event.match) or event.match
+    vim.fn.mkdir(vim.fn.fnamemodify(file, ":p:h"), "p")
+  end,
 })
-
-vim.api.nvim_create_autocmd({ "BufNewFile", "BufRead" }, {
-  group = augroup("filetypes_typescriptreact"),
-  pattern = "*.tsx",
-  command = "setf typescriptreact",
-})
-
-vim.api.nvim_create_autocmd({ "BufNewFile", "BufRead" }, {
-  group = augroup("filetypes_python"),
-  pattern = "*.py",
-  command = "setf python",
-})
-
-vim.o.termguicolors = true
 
 local ok = pcall(vim.cmd.colorscheme, "habamax")
 if not ok then

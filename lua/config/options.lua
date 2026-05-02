@@ -47,8 +47,65 @@ if vim.fn.has("nvim-0.8") == 1 then
   vim.opt.cmdheight = 0
 end
 
+local parent_env = nil
+
+local function read_file(path)
+  local file = io.open(path, "rb")
+  if not file then
+    return nil
+  end
+
+  local data = file:read("*a")
+  file:close()
+  return data
+end
+
+local function load_parent_env()
+  if parent_env ~= nil then
+    return parent_env
+  end
+
+  parent_env = {}
+  local pid = tostring(vim.fn.getpid())
+
+  for _ = 1, 12 do
+    local status = read_file("/proc/" .. pid .. "/status")
+    if not status then
+      break
+    end
+
+    local ppid = status:match("\nPPid:%s+(%d+)") or status:match("^PPid:%s+(%d+)")
+    if not ppid or ppid == "0" then
+      break
+    end
+
+    local environ = read_file("/proc/" .. ppid .. "/environ")
+    if environ then
+      for entry in environ:gmatch("([^%z]+)") do
+        local key, value = entry:match("^([^=]+)=(.*)$")
+        if key and value and parent_env[key] == nil then
+          parent_env[key] = value
+        end
+      end
+    end
+
+    pid = ppid
+  end
+
+  return parent_env
+end
+
+local function inherited_env(name)
+  local value = vim.env[name]
+  if value and value ~= "" then
+    return value
+  end
+
+  return load_parent_env()[name]
+end
+
 local function is_remote()
-  return vim.env.SSH_CONNECTION or vim.env.SSH_CLIENT or vim.env.SSH_TTY
+  return inherited_env("SSH_CONNECTION") or inherited_env("SSH_CLIENT") or inherited_env("SSH_TTY")
 end
 
 if is_remote() then
